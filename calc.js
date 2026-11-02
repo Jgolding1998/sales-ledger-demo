@@ -32,7 +32,11 @@ export function validateRecords(records) {
 
 export function formatMoney(cents) {
   if (!Number.isSafeInteger(cents)) throw new TypeError('Money must be integer cents.');
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+  // Dividing a large safe integer by 100 can round away a cent. Format the
+  // whole-dollar and remainder integers separately, including negative cents.
+  const absolute = Math.abs(cents);
+  const dollars = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.floor(absolute / 100));
+  return (cents < 0 ? '-' : '') + '$' + dollars + '.' + String(absolute % 100).padStart(2, '0');
 }
 
 export function filterRecords(records, { from = '', to = '', basis = 'invoiceDate', search = '', asOf = '2025-12-31' } = {}) {

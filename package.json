@@ -1,6 +1,6 @@
 {
   "name": "sales-ledger-demo",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "A dependency-free dashboard with deterministic fictional sales and receivables.",

@@ -57,15 +57,15 @@
           </div>
           <div class="field">
             <label for="from">From <span class="field__hint" data-basis-label>(invoice date)</span></label>
-            <input id="from" name="from" type="date" required>
+            <input id="from" name="from" type="date" min="1900-01-01" max="2100-12-31" required aria-describedby="basis-help">
           </div>
           <div class="field">
             <label for="to">To <span class="field__hint" data-basis-label>(invoice date)</span></label>
-            <input id="to" name="to" type="date" required>
+            <input id="to" name="to" type="date" min="1900-01-01" max="2100-12-31" required aria-describedby="basis-help">
           </div>
           <div class="field">
             <label for="asof">As-of date</label>
-            <input id="asof" name="asof" type="date" required aria-describedby="asof-help">
+            <input id="asof" name="asof" type="date" min="1900-01-01" max="2100-12-31" required aria-describedby="asof-help">
           </div>
           <div class="field field--actions">
             <button type="button" id="reset" class="btn btn--ghost">Reset filters</button>
@@ -171,7 +171,7 @@
             <button type="button" id="export" class="btn btn--primary">Export CSV</button>
           </div>
         </div>
-        <p class="help" id="search-help">Search matches record ID, account ID or product. Export downloads every filtered row in the current sort order, not just this page.</p>
+        <p class="help" id="search-help">Search matches order ID, account ID or product; press Enter to apply it immediately. Export downloads every filtered row in the current sort order, not just this page.</p>
         <p class="meta" id="table-status" role="status" aria-live="polite"></p>
 
         <div class="table-wrap table-wrap--scroll" tabindex="0" role="region" aria-labelledby="tx-title">
@@ -179,6 +179,7 @@
             <caption class="visually-hidden">Filtered transactions. Column headers are sort buttons.</caption>
             <thead>
               <tr>
+                <th scope="col" data-key="id"><button type="button" class="sort">Order ID</button></th>
                 <th scope="col" data-key="accountId"><button type="button" class="sort">Account ID</button></th>
                 <th scope="col" data-key="product"><button type="button" class="sort">Product</button></th>
                 <th scope="col" data-key="orderDate"><button type="button" class="sort">Order date</button></th>
@@ -192,7 +193,7 @@
             <tbody id="tx-body"></tbody>
           </table>
           <div id="tx-empty" class="empty" hidden>
-            <p class="empty__title">No transactions match these filters.</p>
+            <p class="empty__title" id="tx-empty-title">No transactions match these filters.</p>
             <p class="empty__body" id="tx-empty-body">Try widening the date range, switching the date basis, or clearing the search.</p>
             <button type="button" class="btn btn--ghost" id="empty-reset">Reset filters</button>
           </div>
@@ -200,7 +201,7 @@
 
         <nav class="pager" aria-label="Table pages">
           <button type="button" class="btn btn--ghost" id="prev-page">Previous</button>
-          <span id="page-label" aria-live="polite">Page 1 of 1</span>
+          <span id="page-label">Page 1 of 1</span>
           <button type="button" class="btn btn--ghost" id="next-page">Next</button>
         </nav>
       </section>

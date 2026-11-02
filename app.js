@@ -65,7 +65,10 @@ function money(cents) {
 }
 
 // Display-only axis label (chart ticks). Not used for any reported figure.
-const compactFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+// Ticks come from niceTicks(), so they are round values that compact notation shows exactly.
+const compactFmt = new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2,
+});
 function axisLabel(cents) {
   return compactFmt.format(cents / 100);
 }
@@ -111,11 +114,19 @@ function showFatal(title, details = []) {
   $('scope-summary').textContent = 'Dashboard unavailable.';
 }
 
+const DESCRIBED_BY = { from: 'basis-help', to: 'basis-help', asof: 'asof-help' };
+
 function setFilterError(messages, invalidIds = []) {
   const box = $('filter-error');
   ['from', 'to', 'asof'].forEach((id) => {
-    if (invalidIds.includes(id)) $(id).setAttribute('aria-invalid', 'true');
-    else $(id).removeAttribute('aria-invalid');
+    // Invalid fields point at the error text so it is read again when the field is focused.
+    if (invalidIds.includes(id)) {
+      $(id).setAttribute('aria-invalid', 'true');
+      $(id).setAttribute('aria-describedby', `${DESCRIBED_BY[id]} filter-error`);
+    } else {
+      $(id).removeAttribute('aria-invalid');
+      $(id).setAttribute('aria-describedby', DESCRIBED_BY[id]);
+    }
   });
   if (!messages.length) {
     box.hidden = true;
@@ -217,19 +228,22 @@ function renderKpis(records) {
     document.querySelector(`[data-kpi="${key}"]`).textContent = money(m[key]);
   }
   $('kpi-meta').textContent =
-    `${Number(m.count).toLocaleString('en-US')} records · Paid as of ${state.asOf}: ${money(m.paid)}`;
+    `${Number(m.count).toLocaleString('en-US')} record${m.count === 1 ? '' : 's'} · Paid as of ${state.asOf}: ${money(m.paid)}`;
 }
 
 function chartEmpty(container, message) {
   container.replaceChildren(el('div', { className: 'chart-empty', text: message, attrs: { role: 'status' } }));
 }
 
-function niceMax(value) {
-  if (!(value > 0)) return 1;
-  const exp = 10 ** Math.floor(Math.log10(value));
-  const f = value / exp;
-  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return nice * exp;
+// Round tick step (1/2/2.5/5 × 10^k cents) for about four intervals. The axis top is a whole
+// number of steps, so every gridline label is an exact round amount rather than max/4.
+function niceTicks(value) {
+  if (!(value > 0)) return { step: 100, count: 1 };
+  const raw = value / 4;
+  const exp = 10 ** Math.floor(Math.log10(raw));
+  const f = raw / exp;
+  const step = Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * exp);
+  return { step, count: Math.max(1, Math.ceil(value / step)) };
 }
 
 function renderTrend(records) {
@@ -254,7 +268,8 @@ function renderTrend(records) {
   const W = 640, H = 260;
   const pad = { t: 12, r: 12, b: 32, l: 52 };
   const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
-  const maxVal = niceMax(Math.max(0, ...series.map((p) => Math.max(p.orders, p.invoiced))));
+  const ticks = niceTicks(Math.max(0, ...series.map((p) => Math.max(p.orders, p.invoiced))));
+  const maxVal = ticks.step * ticks.count;
   const n = series.length;
   const x = (i) => pad.l + (n === 1 ? iw / 2 : (iw * i) / (n - 1));
   const y = (v) => pad.t + ih - (ih * v) / maxVal;
@@ -273,8 +288,8 @@ function renderTrend(records) {
       'Full values are available in the trend data table.'),
   );
 
-  for (let i = 0; i <= 4; i++) {
-    const v = (maxVal * i) / 4;
+  for (let i = 0; i <= ticks.count; i++) {
+    const v = ticks.step * i;
     const yy = y(v);
     root.append(
       svg('line', { class: i === 0 ? 'axis-line' : 'grid-line', x1: pad.l, x2: W - pad.r, y1: yy, y2: yy }),
@@ -389,6 +404,22 @@ function updateSortHeaders() {
   });
 }
 
+// Explains an empty valid result. Invoice basis also drops invoices dated after as-of
+// (calc.filterRecords), so an early as-of can empty the table even inside a wide range.
+function emptyReason() {
+  const basis = basisName(state.basis);
+  const asOfLimits = state.basis === 'invoiceDate' && state.asOf < state.to;
+  if (state.search) {
+    return `Nothing matches “${state.search}” in this ${basis} range. Check the spelling or clear the search.`;
+  }
+  if (asOfLimits) {
+    return `No records have an invoice date between ${state.from} and ${state.to} that is also on or before ` +
+      `the as-of date ${state.asOf}. Move the as-of date later, widen the range, or switch to order date.`;
+  }
+  return `No records have an ${basis} between ${state.from} and ${state.to}. ` +
+    'Try widening the range or switching the date basis.';
+}
+
 function renderTable(unavailableMessage) {
   const tbody = $('tx-body');
   const empty = $('tx-empty');
@@ -404,10 +435,10 @@ function renderTable(unavailableMessage) {
 
   if (total === 0) {
     tbody.replaceChildren();
-    $('tx-empty-body').textContent = unavailableMessage ||
-      (state.search
-        ? `Nothing matches “${state.search}” in this ${basisName(state.basis)} range. Check the spelling or clear the search.`
-        : `No records have a ${basisName(state.basis)} between ${state.from} and ${state.to}. Try widening the range or switching the date basis.`);
+    $('tx-empty-title').textContent = unavailableMessage
+      ? 'Transactions are unavailable until the filters are valid.'
+      : 'No transactions match these filters.';
+    $('tx-empty-body').textContent = unavailableMessage || emptyReason();
     empty.hidden = false;
     $('table-status').textContent = unavailableMessage ? '' : 'No matching transactions.';
     return;
@@ -420,17 +451,17 @@ function renderTable(unavailableMessage) {
   for (const row of slice) {
     const r = row.record;
     const futureInvoice = r.invoiceDate > state.asOf;
+    const futureNote = futureInvoice ? { title: `Invoiced after the as-of date ${state.asOf}; not counted in as-of totals` } : {};
     const tr = el('tr', {}, [
-      el('td', { text: r.accountId, attrs: { title: `Record ${r.id}` } }),
+      el('td', { text: r.id }),
+      el('td', { text: r.accountId }),
       el('td', { text: r.product }),
       el('td', { text: r.orderDate }),
-      el('td', {
-        text: r.invoiceDate,
-        className: futureInvoice ? 'is-muted' : '',
-        attrs: futureInvoice ? { title: 'Invoiced after the as-of date' } : {},
-      }),
+      el('td', { text: r.invoiceDate, className: futureInvoice ? 'is-muted' : '', attrs: futureNote }),
       el('td', { text: r.dueDate, className: row.overdue ? 'is-overdue' : '', attrs: row.overdue ? { title: 'Overdue as of the as-of date' } : {} }),
-      el('td', { className: 'num', text: money(r.invoiceAmount) }),
+      // Order basis can keep an order whose invoice is after as-of; show its amount muted so the
+      // column does not look like it disagrees with the as-of Invoice amount card.
+      el('td', { className: `num${futureInvoice ? ' is-muted' : ''}`, text: money(r.invoiceAmount), attrs: futureNote }),
       el('td', { className: 'num', text: money(row.paid) }),
       el('td', { className: `num${row.overdue ? ' is-overdue' : ''}`, text: money(row.outstanding) }),
     ]);
@@ -442,6 +473,12 @@ function renderTable(unavailableMessage) {
 }
 
 function exportCsv() {
+  // Apply a search that is still inside its debounce window, so the file matches the search box.
+  if (flushSearch() && !currentRows.length) {
+    $('table-status').textContent = 'Nothing to export: no transactions match the current search.';
+    $('search').focus(); // the Export button is now disabled; keep keyboard focus somewhere useful
+    return;
+  }
   if (!currentRows.length) return;
   let text;
   try {
@@ -473,10 +510,34 @@ function writeControls() {
   $('page-size').value = String(state.pageSize);
 }
 
+// Applies the search box value now (cancelling any pending debounce). Returns true if it re-rendered.
+function flushSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = 0;
+  const value = $('search').value.trim();
+  if (value === state.search) return false;
+  state.search = value;
+  state.page = 1;
+  render();
+  return true;
+}
+
 function resetFilters() {
+  clearTimeout(searchTimer); // a pending keystroke must not re-apply a search after reset
+  searchTimer = 0;
   Object.assign(state, DEFAULTS, { page: 1 });
   writeControls();
   render();
+}
+
+// Paging buttons disable themselves at either end; move focus instead of dropping it to <body>.
+function changePage(delta, fromBtn) {
+  state.page += delta;
+  renderTable();
+  if (fromBtn.disabled) {
+    const other = fromBtn.id === 'next-page' ? $('prev-page') : $('next-page');
+    (other.disabled ? $('search') : other).focus();
+  }
 }
 
 function bindControls() {
@@ -493,12 +554,10 @@ function bindControls() {
 
   $('search').addEventListener('input', () => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      state.search = $('search').value.trim();
-      state.page = 1;
-      render();
-    }, 200);
+    searchTimer = setTimeout(flushSearch, 200);
   });
+  // Enter applies the search immediately (the field is outside the filter form).
+  $('search').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); flushSearch(); } });
 
   $('reset').addEventListener('click', resetFilters);
   $('empty-reset').addEventListener('click', () => { resetFilters(); $('search').focus(); });
@@ -509,14 +568,15 @@ function bindControls() {
     state.page = 1;
     renderTable();
   });
-  $('prev-page').addEventListener('click', () => { state.page -= 1; renderTable(); });
-  $('next-page').addEventListener('click', () => { state.page += 1; renderTable(); });
+  $('prev-page').addEventListener('click', (e) => changePage(-1, e.currentTarget));
+  $('next-page').addEventListener('click', (e) => changePage(1, e.currentTarget));
 
   document.querySelectorAll('#tx-table thead th[data-key] .sort').forEach((btn) => {
     btn.addEventListener('click', () => {
+      flushSearch(); // sort the rows the search box currently describes
       const key = btn.closest('th').dataset.key;
       if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-      else { state.sortKey = key; state.sortDir = /Date$/.test(key) || key === 'product' || key === 'accountId' ? 'asc' : 'desc'; }
+      else { state.sortKey = key; state.sortDir = /Date$/.test(key) || ['id', 'product', 'accountId'].includes(key) ? 'asc' : 'desc'; }
       currentRows = sortRows(currentRows);
       state.page = 1;
       renderTable();

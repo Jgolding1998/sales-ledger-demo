@@ -82,6 +82,15 @@ test('empty states stay zero, maintain CSV headers and return no invented trends
   assert.equal(formatMoney(12345), '$123.45');
 });
 
+test('money formatting preserves every cent across the accepted safe-integer range', () => {
+  assert.equal(formatMoney(Number.MAX_SAFE_INTEGER), '$90,071,992,547,409.91');
+  assert.equal(formatMoney(-Number.MAX_SAFE_INTEGER), '-$90,071,992,547,409.91');
+  assert.equal(formatMoney(-1), '-$0.01');
+  assert.equal(formatMoney(-0), '$0.00');
+  assert.throws(() => formatMoney(1.5));
+  assert.throws(() => formatMoney(Number.MAX_SAFE_INTEGER + 1));
+});
+
 test('monthly comparisons retain missing calendar months as zero rather than compressing the timeline', () => {
   const records = [base, row({ id: 'March', orderDate: '2025-03-01', invoiceDate: '2025-03-02', dueDate: '2025-03-30', paidAmount: 0, paymentDate: null })];
   assert.deepEqual(monthlySeries(records, '2025-12-31').map(r => r.month), ['2025-01', '2025-02', '2025-03']);

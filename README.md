@@ -16,7 +16,7 @@ npm start
 
 Open `http://127.0.0.1:4173`. No package installation is needed. The server binds only to the local computer and serves an explicit allowlist of five frontend files. Alternatively, use `python -m http.server 4173 --bind 127.0.0.1` in this folder. ES modules need an HTTP origin; opening `index.html` directly as a file is unsupported.
 
-Run the pure calculation tests with:
+Run the calculation and local-server tests with:
 
 ```sh
 npm test
@@ -27,8 +27,8 @@ npm test
 1. Start with the fixed 2025 date range and 2025-12-31 as-of date.
 2. Switch between invoice date and order date. This changes which **rows** are selected, rather than silently giving each card a different filter.
 3. Move the as-of date earlier to see invoices and payments disappear from balances until their own dates arrive.
-4. Search `SampleAccount001` or `ComponentA`. The cards, charts, table and CSV use the same selected cohort.
-5. Export CSV. It contains the current rows and as-of paid/outstanding values, with decimal USD amounts and formula-safe text.
+4. Search `SampleAccount001` or `ComponentA`; press Enter to apply immediately. The cards, charts, table and CSV use the same selected cohort.
+5. Export CSV. It applies any pending search before creating the file, then includes every matching row and its as-of paid/outstanding values, with decimal USD amounts and formula-safe text.
 
 ## What the numbers mean
 
@@ -56,7 +56,7 @@ npm test
 
 ## Privacy and design decisions
 
-All application resources are local. The browser has no data-fetch API calls and writes no application data to browser storage. CSV export creates a local download; it does not transmit data. The Node server adds a restrictive content security policy. A loaded page remains interactive without a network; initial loading and reloading still require the local static server. No service worker is installed.
+All application resources are local. The browser has no data-fetch API calls and writes no application data to browser storage. CSV export creates a local download; it does not transmit data. The Node server adds a restrictive content security policy to successful and application error responses, accepts local Host names, rejects request bodies and serves only its five frontend files. It bounds headers and uses short request timeouts. These guards apply to `npm start`; Python's optional static server has its own behavior. A loaded page remains interactive without a network; initial loading and reloading still require the local static server. No service worker is installed.
 
 The research notes in [docs/research.md](docs/research.md) record public BI examples and issue-derived testing decisions. No code, assets or datasets were copied from those projects. The UI and SVG charts are authored for this example, with system fonts.
 
