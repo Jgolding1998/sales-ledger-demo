@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="data:,">
+  <title>Sales &amp; Receivables — Fictional Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to dashboard</a>
+
+  <div class="demo-banner" role="note">
+    <strong>Fictional demo data</strong>
+    <span class="demo-banner__detail">All accounts, products and amounts are synthetic. Not real financial information.</span>
+  </div>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Dashboard sections">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span class="brand__name">Sales Demo</span>
+      </div>
+      <ul class="nav-list">
+        <li><a href="#filters">Filters</a></li>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#trend">Monthly trend</a></li>
+        <li><a href="#aging">Receivables aging</a></li>
+        <li><a href="#transactions">Transactions</a></li>
+      </ul>
+    </nav>
+
+    <main id="main" class="main" tabindex="-1">
+      <header class="page-header">
+        <h1>Sales &amp; receivables</h1>
+        <p class="page-header__sub" id="scope-summary" aria-live="polite">Loading dashboard…</p>
+      </header>
+
+      <div id="load-status" class="notice notice--error" role="alert">
+        The dashboard scripts did not start. Browsers block JavaScript modules opened directly from disk
+        (<code>file://</code>). Serve this folder with any local static file server and open it over
+        <code>http://localhost</code>.
+      </div>
+
+      <section id="filters" class="panel filters" aria-labelledby="filters-title">
+        <h2 id="filters-title" class="visually-hidden">Filters</h2>
+        <form id="filter-form" class="filter-grid" novalidate>
+          <div class="field">
+            <label for="basis">Date basis</label>
+            <select id="basis" name="basis" aria-describedby="basis-help">
+              <option value="invoiceDate">Invoice date</option>
+              <option value="orderDate">Order date</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="from">From <span class="field__hint" data-basis-label>(invoice date)</span></label>
+            <input id="from" name="from" type="date" required>
+          </div>
+          <div class="field">
+            <label for="to">To <span class="field__hint" data-basis-label>(invoice date)</span></label>
+            <input id="to" name="to" type="date" required>
+          </div>
+          <div class="field">
+            <label for="asof">As-of date</label>
+            <input id="asof" name="asof" type="date" required aria-describedby="asof-help">
+          </div>
+          <div class="field field--actions">
+            <button type="button" id="reset" class="btn btn--ghost">Reset filters</button>
+          </div>
+        </form>
+        <p class="help" id="basis-help">
+          <strong>Date basis</strong> decides which date must fall between From and To (both inclusive):
+          the invoice date or the order date.
+        </p>
+        <p class="help" id="asof-help">
+          <strong>As-of date</strong> controls invoice visibility and balances: invoices dated after it are
+          excluded (invoice basis) or carry no balance (order basis), and a payment only reduces the balance
+          when its payment date is on or before the as-of date. Overdue means past due date as of that day.
+        </p>
+        <div id="filter-error" class="notice notice--error" role="alert" hidden></div>
+      </section>
+
+      <section id="overview" aria-labelledby="overview-title">
+        <h2 id="overview-title" class="section-title">Overview</h2>
+        <div class="kpis" id="kpis">
+          <article class="kpi">
+            <h3 class="kpi__label">Order amount</h3>
+            <p class="kpi__value" data-kpi="orders">—</p>
+            <p class="kpi__note" data-kpi-note="orders">Ordered on or before as-of</p>
+          </article>
+          <article class="kpi">
+            <h3 class="kpi__label">Invoice amount</h3>
+            <p class="kpi__value" data-kpi="invoiced">—</p>
+            <p class="kpi__note" data-kpi-note="invoiced">Invoiced on or before as-of</p>
+          </article>
+          <article class="kpi">
+            <h3 class="kpi__label">Outstanding receivables</h3>
+            <p class="kpi__value" data-kpi="outstanding">—</p>
+            <p class="kpi__note" data-kpi-note="asof">Unpaid as of —</p>
+          </article>
+          <article class="kpi kpi--alert">
+            <h3 class="kpi__label">Overdue</h3>
+            <p class="kpi__value" data-kpi="overdue">—</p>
+            <p class="kpi__note">Outstanding past due date</p>
+          </article>
+        </div>
+        <p class="meta" id="kpi-meta"></p>
+      </section>
+
+      <div class="charts">
+        <section id="trend" class="panel" aria-labelledby="trend-title">
+          <div class="panel__head">
+            <h2 id="trend-title" class="section-title">Invoice vs order totals by month</h2>
+            <ul class="legend" aria-hidden="true">
+              <li><span class="swatch swatch--invoice"></span>Invoiced (by invoice month)</li>
+              <li><span class="swatch swatch--order"></span>Orders (by order month)</li>
+            </ul>
+          </div>
+          <div class="chart" id="trend-chart"></div>
+          <details class="chart-data">
+            <summary>Show trend data as a table</summary>
+            <div class="table-wrap">
+              <table class="data-table data-table--compact" id="trend-table">
+                <caption class="visually-hidden">Monthly order and invoice totals</caption>
+                <thead><tr><th scope="col">Month</th><th scope="col" class="num">Orders</th><th scope="col" class="num">Invoiced</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+
+        <section id="aging" class="panel" aria-labelledby="aging-title">
+          <div class="panel__head">
+            <h2 id="aging-title" class="section-title">Receivables aging</h2>
+            <p class="panel__sub" id="aging-sub">Days past due as of —</p>
+          </div>
+          <div class="chart" id="aging-chart"></div>
+          <details class="chart-data">
+            <summary>Show aging data as a table</summary>
+            <div class="table-wrap">
+              <table class="data-table data-table--compact" id="aging-table">
+                <caption class="visually-hidden">Outstanding receivables by days past due</caption>
+                <thead><tr><th scope="col">Bucket</th><th scope="col" class="num">Invoices</th><th scope="col" class="num">Outstanding</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <section id="transactions" class="panel" aria-labelledby="tx-title">
+        <div class="panel__head panel__head--wrap">
+          <h2 id="tx-title" class="section-title">Transactions</h2>
+          <div class="table-tools">
+            <div class="field field--inline">
+              <label for="search">Search</label>
+              <input id="search" type="search" maxlength="100" placeholder="ID, account or product" autocomplete="off" aria-describedby="search-help">
+            </div>
+            <div class="field field--inline">
+              <label for="page-size">Rows</label>
+              <select id="page-size">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <button type="button" id="export" class="btn btn--primary">Export CSV</button>
+          </div>
+        </div>
+        <p class="help" id="search-help">Search matches record ID, account ID or product. Export downloads every filtered row in the current sort order, not just this page.</p>
+        <p class="meta" id="table-status" role="status" aria-live="polite"></p>
+
+        <div class="table-wrap table-wrap--scroll" tabindex="0" role="region" aria-labelledby="tx-title">
+          <table class="data-table" id="tx-table">
+            <caption class="visually-hidden">Filtered transactions. Column headers are sort buttons.</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-key="accountId"><button type="button" class="sort">Account ID</button></th>
+                <th scope="col" data-key="product"><button type="button" class="sort">Product</button></th>
+                <th scope="col" data-key="orderDate"><button type="button" class="sort">Order date</button></th>
+                <th scope="col" data-key="invoiceDate"><button type="button" class="sort">Invoice date</button></th>
+                <th scope="col" data-key="dueDate"><button type="button" class="sort">Due date</button></th>
+                <th scope="col" data-key="invoiceAmount" class="num"><button type="button" class="sort">Invoiced</button></th>
+                <th scope="col" data-key="paid" class="num"><button type="button" class="sort">Paid</button></th>
+                <th scope="col" data-key="outstanding" class="num"><button type="button" class="sort">Outstanding</button></th>
+              </tr>
+            </thead>
+            <tbody id="tx-body"></tbody>
+          </table>
+          <div id="tx-empty" class="empty" hidden>
+            <p class="empty__title">No transactions match these filters.</p>
+            <p class="empty__body" id="tx-empty-body">Try widening the date range, switching the date basis, or clearing the search.</p>
+            <button type="button" class="btn btn--ghost" id="empty-reset">Reset filters</button>
+          </div>
+        </div>
+
+        <nav class="pager" aria-label="Table pages">
+          <button type="button" class="btn btn--ghost" id="prev-page">Previous</button>
+          <span id="page-label" aria-live="polite">Page 1 of 1</span>
+          <button type="button" class="btn btn--ghost" id="next-page">Next</button>
+        </nav>
+      </section>
+
+      <footer class="footer">
+        <p>Static demo. Runs entirely in your browser; no data leaves this page. All data is fictional.</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

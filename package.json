@@ -1,0 +1,10 @@
+{
+  "name": "sales-ledger-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A dependency-free dashboard with deterministic fictional sales and receivables.",
+  "scripts": { "test": "node --test tests/*.test.js", "start": "node serve.js" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}
